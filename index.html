@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Route Optimizer</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- FULL-SCREEN MAP CANVAS -->
+<canvas id="mapCanvas"></canvas>
+
+<!-- OVERLAY UI -->
+<div id="overlay">
+
+  <!-- ── TOP BAR ─────────────────────────────── -->
+  <div id="topbar">
+    <div class="topbar-logo">
+      <div class="icon">🗺</div>
+      <h1>Route Optimizer</h1>
+    </div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-selects">
+      <div class="sel-wrap">
+        <div class="sel-dot start"></div>
+        <select id="startSel"></select>
+      </div>
+      <span class="route-arrow">→</span>
+      <div class="sel-wrap">
+        <div class="sel-dot end"></div>
+        <select id="endSel"></select>
+      </div>
+    </div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-badge" id="daaBadge">DAA PBL</div>
+  </div>
+
+  <!-- ── CURRENTLY RUNNING BADGE ───────────────── -->
+  <div id="currentAlgoBadge">
+    <div class="badge-pip" id="badgePip"></div>
+    <span id="badgeText">Running Dijkstra…</span>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       LEFT PANEL — Controls + Separate Algo Boxes
+  ══════════════════════════════════════════════ -->
+  <div id="leftPanel">
+
+    <!-- Node selector + traffic -->
+    <div class="panel-card">
+      <div class="card-title">Configuration</div>
+
+      <div class="traffic-wrap">
+        <div class="traffic-header">
+          <span class="traffic-label">Traffic Level</span>
+          <span class="traffic-badge tb-low" id="trafficBadge">LOW</span>
+        </div>
+        <div class="range-track" id="rangeTrack">
+          <div class="range-fill" id="rangeFill" style="width:16.5%; background:var(--success);"></div>
+          <input type="range" id="trafficSlider" min="1" max="3" value="1" step="1" />
+        </div>
+        <div class="range-labels">
+          <span>Free flow</span><span>Heavy jam</span>
+        </div>
+      </div>
+
+      <div class="divider-h"></div>
+
+      <!-- Speed control -->
+      <div class="speed-wrap">
+        <div class="speed-label">Animation Speed</div>
+        <div class="speed-btns">
+          <div class="speed-btn" data-speed="300">0.5×</div>
+          <div class="speed-btn active" data-speed="150">1×</div>
+          <div class="speed-btn" data-speed="60">2×</div>
+          <div class="speed-btn" data-speed="15">5×</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SEPARATE ALGORITHM BOXES ─────────────── -->
+    <div class="card-title" style="padding-left:4px;margin-bottom:4px">Algorithms</div>
+
+    <!-- Dijkstra Box -->
+    <div class="algo-box" id="abox-dijkstra" data-algo="dijkstra" style="--ac:var(--c-dijkstra)">
+      <div class="abox-header">
+        <div class="abox-pip"></div>
+        <div class="abox-title">Dijkstra</div>
+        <div class="abox-complexity">O((V+E) log V)</div>
+        <div class="abox-toggle active" id="atoggle-dijkstra">ON</div>
+      </div>
+      <div class="abox-desc">Greedy shortest-path using a min-priority queue. Explores nearest unvisited node first.</div>
+      <div class="abox-status" id="astatus-dijkstra">
+        <span class="ast-dot"></span>
+        <span class="ast-text">Waiting</span>
+      </div>
+    </div>
+
+    <!-- Bellman-Ford Box -->
+    <div class="algo-box" id="abox-bellman" data-algo="bellman" style="--ac:var(--c-bellman)">
+      <div class="abox-header">
+        <div class="abox-pip"></div>
+        <div class="abox-title">Bellman-Ford</div>
+        <div class="abox-complexity">O(V × E)</div>
+        <div class="abox-toggle active" id="atoggle-bellman">ON</div>
+      </div>
+      <div class="abox-desc">Relaxes all edges V−1 times. Handles negative weights, explores more nodes.</div>
+      <div class="abox-status" id="astatus-bellman">
+        <span class="ast-dot"></span>
+        <span class="ast-text">Waiting</span>
+      </div>
+    </div>
+
+    <!-- A* Box -->
+    <div class="algo-box" id="abox-astar" data-algo="astar" style="--ac:var(--c-astar)">
+      <div class="abox-header">
+        <div class="abox-pip"></div>
+        <div class="abox-title">A* Search</div>
+        <div class="abox-complexity">O(E · h(n))</div>
+        <div class="abox-toggle active" id="atoggle-astar">ON</div>
+      </div>
+      <div class="abox-desc">Heuristic-guided search (Euclidean distance). Fastest in practice, fewest nodes visited.</div>
+      <div class="abox-status" id="astatus-astar">
+        <span class="ast-dot"></span>
+        <span class="ast-text">Waiting</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       RIGHT PANEL — Step-by-step explanation + Results
+  ══════════════════════════════════════════════ -->
+  <div id="rightPanel">
+
+    <!-- Live step log -->
+    <div class="panel-card" id="stepLogCard">
+      <div class="card-title" id="stepLogTitle">
+        <span class="step-pip" id="stepPip"></span>
+        Algorithm Steps
+      </div>
+      <div id="stepLog">
+        <div class="step-idle">Press <strong>Start</strong> to begin visualization</div>
+      </div>
+    </div>
+
+    <!-- Results (one per algo) -->
+    <div class="result-card" id="rc-dijkstra" style="--rc-color:var(--c-dijkstra)">
+      <div class="rc-header">
+        <div class="rc-pip"></div>
+        <span class="rc-name">Dijkstra</span>
+        <span class="rc-status status-waiting" id="rs-dijkstra">Waiting</span>
+      </div>
+      <div class="rc-path" id="rp-dijkstra">—</div>
+      <div class="rc-stats">
+        <div class="rc-stat">
+          <div class="rc-stat-val" id="rv-cost-dijkstra">—</div>
+          <div class="rc-stat-key">Cost</div>
+        </div>
+        <div class="rc-stat">
+          <div class="rc-stat-val" id="rv-nodes-dijkstra">—</div>
+          <div class="rc-stat-key">Visited</div>
+        </div>
+        <div class="rc-stat">
+          <div class="rc-stat-val" id="rv-time-dijkstra">—</div>
+          <div class="rc-stat-key">ms</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-card" id="rc-bellman" style="--rc-color:var(--c-bellman)">
+      <div class="rc-header">
+        <div class="rc-pip"></div>
+        <span class="rc-name">Bellman-Ford</span>
+        <span class="rc-status status-waiting" id="rs-bellman">Waiting</span>
+      </div>
+      <div class="rc-path" id="rp-bellman">—</div>
+      <div class="rc-stats">
+        <div class="rc-stat">
+          <div class="rc-stat-val" id="rv-cost-bellman">—</div>
+          <div class="rc-stat-key">Cost</div>
+        </div>
+        <div class="rc-stat">
+          <div class="rc-stat-val" id="rv-nodes-bellman">—</div>
+          <div class="rc-stat-key">Visited</div>
+        </div>
+        <div class="rc-stat">
+          <div class="rc-stat-val" id="rv-time-bellman">—</div>
+          <div class="rc-stat-key">ms</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-card" id="rc-astar" style="--rc-color:var(--c-astar)">
+      <div class="rc-header">
+        <div class="rc-pip"></div>
+        <span class="rc-name">A* Search</span>
+        <span class="rc-status status-waiting" id="rs-astar">Waiting</span>
+      </div>
+      <div class="rc-path" id="rp-astar">—</div>
+      <div class="rc-stats">
+        <div class="rc-stat">
+          <div class="rc-stat-val" id="rv-cost-astar">—</div>
+          <div class="rc-stat-key">Cost</div>
+        </div>
+        <div class="rc-stat">
+          <div class="rc-stat-val" id="rv-nodes-astar">—</div>
+          <div class="rc-stat-key">Visited</div>
+        </div>
+        <div class="rc-stat">
+          <div class="rc-stat-val" id="rv-time-astar">—</div>
+          <div class="rc-stat-key">ms</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── BOTTOM CONTROL BAR ──────────────────── -->
+  <div id="controlBar">
+    <div class="progress-pills">
+      <div class="pill" id="pill-dijkstra" style="--pill-color:var(--c-dijkstra); width:64px;"></div>
+      <div class="pill" id="pill-bellman"  style="--pill-color:var(--c-bellman);  width:64px;"></div>
+      <div class="pill" id="pill-astar"    style="--pill-color:var(--c-astar);    width:64px;"></div>
+    </div>
+    <div class="ctrl-divider"></div>
+    <button class="ctrl-btn btn-run"   id="btnRun"><span class="btn-icon">▶</span> Start</button>
+    <button class="ctrl-btn btn-pause" id="btnPause" disabled><span class="btn-icon">⏸</span> Pause</button>
+    <button class="ctrl-btn btn-reset" id="btnReset"><span class="btn-icon">↺</span> Reset</button>
+  </div>
+
+  <!-- ── COMPARISON PANEL ──────────────────────── -->
+  <div id="comparePanel">
+    <div class="cmp-title">Final Comparison — Path Cost</div>
+    <div class="cmp-row" id="cmp-dijkstra" style="--cmp-color:var(--c-dijkstra)">
+      <span class="cmp-name" style="color:var(--c-dijkstra)">Dijkstra</span>
+      <div class="cmp-track"><div class="cmp-fill" style="width:0%"></div></div>
+      <span class="cmp-val">—</span>
+      <span class="cmp-meta">— visited</span>
+    </div>
+    <div class="cmp-row" id="cmp-bellman" style="--cmp-color:var(--c-bellman)">
+      <span class="cmp-name" style="color:var(--c-bellman)">Bellman-Ford</span>
+      <div class="cmp-track"><div class="cmp-fill" style="width:0%"></div></div>
+      <span class="cmp-val">—</span>
+      <span class="cmp-meta">— visited</span>
+    </div>
+    <div class="cmp-row" id="cmp-astar" style="--cmp-color:var(--c-astar)">
+      <span class="cmp-name" style="color:var(--c-astar)">A* Search</span>
+      <div class="cmp-track"><div class="cmp-fill" style="width:0%"></div></div>
+      <span class="cmp-val">—</span>
+      <span class="cmp-meta">— visited</span>
+    </div>
+  </div>
+
+  <!-- ── ZOOM CONTROLS ─────────────────────────── -->
+  <div id="zoomControls">
+    <button class="zoom-btn" id="zoomIn">+</button>
+    <div class="zoom-divider"></div>
+    <button class="zoom-btn" id="zoomOut">−</button>
+  </div>
+
+  <!-- ── TOOLTIP ───────────────────────────────── -->
+  <div id="tooltip"></div>
+
+</div><!-- /overlay -->
+
+<script src="js/data.js"></script>
+<script src="js/canvas.js"></script>
+<script src="js/algorithms.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
